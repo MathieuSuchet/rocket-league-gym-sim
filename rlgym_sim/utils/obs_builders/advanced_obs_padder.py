@@ -1,17 +1,19 @@
 import math
-import numpy as np
 from typing import Any, List
-from rlgym_sim.utils import common_values
+
+import numpy as np
+
+from rlgym_sim.utils import ObsBuilder, common_values
 from rlgym_sim.utils.gamestates import PlayerData, GameState, PhysicsObject
-from rlgym_sim.utils.obs_builders import ObsBuilder
 
 
-class AdvancedObs(ObsBuilder):
-    POS_STD = 2300 # If you read this and wonder why, ping Rangler in the dead of night.
+class AdvancedObsPadder(ObsBuilder):
+    POS_STD = 2300  # If you read this and wonder why, ping Rangler in the dead of night.
     ANG_STD = math.pi
 
-    def __init__(self):
+    def __init__(self, max_team_size: int = 3):
         super().__init__()
+        self.max_team_size = max_team_size
 
     def reset(self, initial_state: GameState):
         pass
@@ -38,6 +40,9 @@ class AdvancedObs(ObsBuilder):
         allies = []
         enemies = []
 
+        allies_padding_size = self.max_team_size - len([0 for p in state.players if p.team_num == player.team_num])
+        enemies_padding_size = self.max_team_size - len([0 for p in state.players if p.team_num != player.team_num])
+
         for other in state.players:
             if other.car_id == player.car_id:
                 continue
@@ -54,6 +59,12 @@ class AdvancedObs(ObsBuilder):
                 (other_car.position - player_car.position) / self.POS_STD,
                 (other_car.linear_velocity - player_car.linear_velocity) / self.POS_STD
             ])
+
+        for _ in range(allies_padding_size):
+            self._add_empty_player(allies)
+
+        for _ in range(enemies_padding_size):
+            self._add_empty_player(enemies)
 
         obs.extend(allies)
         obs.extend(enemies)
@@ -86,3 +97,6 @@ class AdvancedObs(ObsBuilder):
              int(player.has_flip_reset)]])
 
         return player_car
+
+    def _add_empty_player(self, obs):
+        obs.extend([[0] * 35])
