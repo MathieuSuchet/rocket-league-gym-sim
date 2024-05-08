@@ -1,8 +1,11 @@
+from typing import Dict
+
 import RocketSim as rsim
-from rlgym_sim.utils.gamestates import GameState, PhysicsObject
-from rlgym_sim.utils import common_values, math
-from rlgym_sim.simulator import Player
 import numpy as np
+
+from rlgym_sim.simulator import Player
+from rlgym_sim.utils import common_values, math
+from rlgym_sim.utils.gamestates import GameState
 
 
 class RocketSimGame(object):
@@ -16,6 +19,8 @@ class RocketSimGame(object):
         self.copy_gamestate = copy_gamestate
 
         self.arena = rsim.Arena(rsim.GameMode.SOCCAR)
+        self.arena.set_car_bump_callback(self.bump_callback)
+        self.arena.set_shot_event_callback(self.shot_callback)
 
         self.tick_skip = tick_skip
         self.team_size = match.team_size
@@ -30,6 +35,7 @@ class RocketSimGame(object):
         self.car_id_to_spectator_map = {}
         self.spectator_to_ordered_list_map = {}
         self.cars = []
+        self.misc_values: Dict[int, Dict] = {}
 
         self.blue_score = 0
         self.orange_score = 0
@@ -37,6 +43,17 @@ class RocketSimGame(object):
 
         self.gamestate = GameState()
         self.new_game(self.tick_skip, self.team_size, self.spawn_opponents)
+
+    def bump_callback(self, arena, bumper: rsim.Car, victim: rsim.Car, is_demo: bool, data):
+        if not is_demo:
+            self.misc_values[bumper.id].setdefault("bumped_id", victim.id)
+        else:
+            self.misc_values[bumper.id].setdefault("demoed_id", victim.id)
+
+
+    def shot_callback(self, arena, shooter: rsim.Car, passer: rsim.Car, data):
+        if passer:
+            self.misc_values[passer.id].setdefault("passed_id", shooter.id)
 
     def new_game(self, tick_skip, team_size, spawn_opponents):
         cars = self.arena.get_cars()
@@ -81,9 +98,11 @@ class RocketSimGame(object):
                 orange_idx += 1
 
         self.players.clear()
+        self.misc_values.clear()
         cars = self.arena.get_cars()
         for car in cars:
             self.players[car.id] = Player(car, self.car_id_to_spectator_map[car.id])
+            self.misc_values.setdefault(car.id, {})
 
         self.cars = cars
         self._build_index_maps()
@@ -139,7 +158,7 @@ class RocketSimGame(object):
                 car_state.is_auto_flipping = False # flip component
                 car_state.auto_flip_timer = 0
                 car_state.is_jumping = False # jump component
-                car_state.time_spent_boosting = 0 # boost component
+                car_state.time_spent_boosting = 0 # boost
 
                 car.set_state(car_state)
                 car.set_controls(rsim.CarControls())
@@ -218,7 +237,8 @@ class RocketSimGame(object):
                                  "DID YOU STATE SET MULTIPLE OBJECTS IN THE SAME LOCATION?".format(player_data))
 
             player = players[int(player_data[0][0])]
-            player.update(player_data)
+            player.update(player_data, self.misc_values[player.id])
+            self.arena.get_car_from_id(1)
             gamestate.players[self.spectator_to_ordered_list_map[player.data.car_id]] = player.data
 
         if self.copy_gamestate:

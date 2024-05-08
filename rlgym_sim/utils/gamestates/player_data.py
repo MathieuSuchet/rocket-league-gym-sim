@@ -20,6 +20,10 @@ class PlayerData(object):
         self.has_jump: bool = False
         self.has_flip: bool = False
         self.boost_amount: float = -1
+        self.has_flip_reset: bool = False
+        self.bumped_id: int = -1
+        self.passed_id: int = -1
+        self.demoed_id: int = -1
         self.car_data: PhysicsObject = PhysicsObject()
         self.inverted_car_data: PhysicsObject = PhysicsObject()
 
@@ -36,6 +40,7 @@ class PlayerData(object):
         self.ball_touched = other.ball_touched
         self.has_jump = other.has_jump
         self.has_flip = other.has_flip
+        self.has_flip_reset = other.has_flip_reset
         self.boost_amount = other.boost_amount
         self.car_data.copy(other.car_data)
         self.inverted_car_data.copy(other.inverted_car_data)
@@ -55,6 +60,9 @@ class PlayerData(object):
 
         self.car_data.decode_data(car_data[0][11:36])
         self.inverted_car_data.decode_data(car_data[1][11:36])
+
+    def decode_misc(self, misc_data):
+        self.__dict__.update(misc_data)
 
     def __str__(self):
         output = "****PLAYER DATA OBJECT****\n" \
